@@ -18,6 +18,7 @@
 #include "sdk.h"
 #include "gfx_load.h"
 #include "cache.h"
+#include "badgetime.h"
 
 #include "libsynth.h"
 #include "synth_utils.h"
@@ -140,30 +141,6 @@ uint32_t *GFXSPRITES = (uint32_t *)0x5000C000;
 //
 /////////////////////////////////////////////////////////////////////////////
 
-//Borrowed this from lcd.c until a better solution comes along :/
-static void __INEFFICIENT_delay(int n) {
-	for (int i=0; i<n; i++) {
-		for (volatile int t=0; t<(1<<11); t++);
-	}
-}
-
-//Wait until all buttons are released
-static inline void __button_wait_for_press() {
-	while (MISC_REG(MISC_BTN_REG) == 0);
-}
-
-//Wait until all buttons are released
-static inline void __button_wait_for_release() {
-	while (MISC_REG(MISC_BTN_REG));
-}
-
-static inline void __sprite_set(int index, int x, int y, int size_x, int size_y, int tile_index, int palstart) {
-	x+=64;
-	y+=64;
-	GFXSPRITES[index*2]=(y<<16)|x;
-	GFXSPRITES[index*2+1]=size_x|(size_y<<8)|(tile_index<<16)|((palstart/4)<<25);
-}
-
 //Helper function to set a tile on layer a
 static inline void __tile_a_set(uint8_t x, uint8_t y, uint32_t index) {
 	GFXTILEMAPA[y*GFX_TILEMAP_W+x] = index;
@@ -182,10 +159,6 @@ static inline void __tile_a_translate(int dx, int dy) {
 //Helper function to move tile layer b
 static inline void __tile_b_translate(int dx, int dy) {
 	GFX_REG(GFX_TILEB_OFF)=(dy<<16)+(dx &0xffff);
-}
-
-uint32_t counter60hz(void) {
-	return GFX_REG(GFX_VBLCTR_REG);
 }
 
 void gfx_set_xlate_val(int layer, int xcenter, int ycenter, float scale, float rot) {
@@ -269,7 +242,7 @@ void gameboy_monochrome_splash() {
 	GFXPAL[FB_PAL_OFFSET+0x1ff]=0x40ff00ff; //so it becomes this instead.
 
 	//This makes sure not to read button still pressed from badge menu selection
-	__button_wait_for_release();
+	wait_for_button_release();
 
 	//Set map to tilemap B, clear tilemap, set attr to 0
 	//Not sure yet what attr does, but tilemap be is important as it will have the effect of layering
@@ -321,11 +294,11 @@ void gameboy_monochrome_splash() {
 	// Bring A back down
 	for (int16_t y = y_offscreen; y > 0; y -= 8) {
 		__tile_a_translate(0,y);
-		__INEFFICIENT_delay(1);
+		delay(1);
 	}
 
 	// Logo complete, allow admiration for a short time before exiting.
-	__INEFFICIENT_delay(750);
+	delay(750);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -383,7 +356,7 @@ void gameboy_color_splash() {
 	GFXPAL[FB_PAL_OFFSET+0x1ff]=0x40ff00ff; //so it becomes this instead.
 
 	//This makes sure not to read button still pressed from badge menu selection
-	__button_wait_for_release();
+	wait_for_button_release();
 
 	//Set map to tilemap B, clear tilemap, set attr to 0
 	//Not sure yet what attr does, but tilemap be is important as it will have the effect of layering
@@ -472,7 +445,7 @@ void gameboy_color_splash() {
 	__tile_a_translate(x_layera,4096);
 	while(1)
 	{
-		__INEFFICIENT_delay(600);
+		delay(600);
 
 		while(loopcounter++ < 736) {
 			if (loopcounter > 480) {
@@ -482,10 +455,10 @@ void gameboy_color_splash() {
 			x_layera -= 64;
 			__tile_a_translate(x_layera,y_layera);
 			if ((MISC_REG(MISC_BTN_REG) & BUTTON_SELECT)) {	return;	}
-			__INEFFICIENT_delay(1);
+			delay(1);
 		}
 
-		__INEFFICIENT_delay(800);
+		delay(800);
 		return;
 	}
 }
@@ -551,7 +524,7 @@ void playstation_splash() {
 	GFXPAL[FB_PAL_OFFSET+0x1ff]=0x40ff00ff; //so it becomes this instead.
 
 	//This makes sure not to read button still pressed from badge menu selection
-	__button_wait_for_release();
+	wait_for_button_release();
 
 	//Set map to tilemap B, clear tilemap, set attr to 0
 	//Not sure yet what attr does, but tilemap be is important as it will have the effect of layering
@@ -602,7 +575,7 @@ void playstation_splash() {
 		}
 		__tile_a_translate(dx,0);
 		// more delay for audio: this was 1 (per cycle)
-		__INEFFICIENT_delay(2);
+		delay(2);
 	}
 }
 
@@ -666,7 +639,7 @@ void sega_splash() {
 	GFXPAL[FB_PAL_OFFSET+0x1ff]=0x40ff00ff; //so it becomes this instead.
 
 	//This makes sure not to read button still pressed from badge menu selection
-	__button_wait_for_release();
+	wait_for_button_release();
 
 	//Set map to tilemap B, clear tilemap, set attr to 0
 	//Not sure yet what attr does, but tilemap be is important as it will have the effect of layering
@@ -747,13 +720,13 @@ void sega_splash() {
 	GFX_REG(GFX_LAYEREN_REG)=GFX_LAYEREN_TILEA|GFX_LAYEREN_TILEB;
 
 	// Wait a bit before starting the sweep
-	__INEFFICIENT_delay(250);
+	delay(250);
 
 	int16_t step_size = 64;
 	// Cyan bar sweeps right
 	for (uint16_t count=0; count<(64*16*TILEGRID_WIDTH); count+=step_size) {
 		__tile_a_translate(x_translate-count,y_translate);
-		__INEFFICIENT_delay(1);
+		delay(1);
 	}
 
 	// Palette color appears to be in AABBGGRR format:
@@ -769,7 +742,7 @@ void sega_splash() {
 	GFXPAL[PAL_SEGA_CYAN] = 0xFFFFFFFF;
 
 	// Wait to start fading in blue
-	__INEFFICIENT_delay(100);
+	delay(100);
 
 	synth_play_sega();
 	// Move in the solid cyan (now palette changed to white) horizontal bar for palette animation
@@ -782,13 +755,13 @@ void sega_splash() {
 		color |= fade;
 		color |= fade << 8;
 		GFXPAL[PAL_SEGA_CYAN] = color;
-		__INEFFICIENT_delay(1);
+		delay(1);
 	}
 
 	// Logo complete, allow admiration for a short time before exiting.
-	__INEFFICIENT_delay(750);
+	delay(750);
 	// Extra delay b/c sound is long
-	__INEFFICIENT_delay(750); 
+	delay(750); 
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -849,7 +822,7 @@ void switch_splash() {
 	GFXPAL[FB_PAL_OFFSET+0x1ff]=0x40ff00ff; //so it becomes this instead.
 
 	//This makes sure not to read button still pressed from badge menu selection
-	__button_wait_for_release();
+	wait_for_button_release();
 
 	//Set map to tilemap B, clear tilemap, set attr to 0
 	//Not sure yet what attr does, but tilemap be is important as it will have the effect of layering
@@ -900,18 +873,18 @@ void switch_splash() {
 	GFX_REG(GFX_LAYEREN_REG)=GFX_LAYEREN_FB|GFX_LAYEREN_TILEA|GFX_LAYEREN_TILEB;
 
 	// Wait a bit before starting animation
-	__INEFFICIENT_delay(100);
+	delay(100);
 
 	// Animate right joycon upwards
 	for (; y_translate < B_Y_START+(B_Y_START/4); y_translate+=16) {
 		__tile_b_translate(0,y_translate);
-		__INEFFICIENT_delay(1);
+		delay(1);
 	}
 
 	// Animate right joycon down until even.
 	for (; y_translate > 0; y_translate-=32) {
 		__tile_b_translate(0,y_translate);
-		__INEFFICIENT_delay(1);
+		delay(1);
 	}
     // Make the snapping noise
 			synth_play_switch();
@@ -930,18 +903,18 @@ void switch_splash() {
 	for (int16_t bounce=0; bounce < B_Y_START/2; bounce+=32) {
 		__tile_a_translate(0,y_translate-bounce);
 		__tile_b_translate(0,y_translate-bounce);
-		__INEFFICIENT_delay(1);
+		delay(1);
 	}
 
 	// And back up to neutral position
 	for (int16_t bounce=B_Y_START/2; bounce > 0; bounce-=32) {
 		__tile_a_translate(0,y_translate-bounce);
 		__tile_b_translate(0,y_translate-bounce);
-		__INEFFICIENT_delay(1);
+		delay(1);
 	}
 
 	// Logo complete, allow admiration for a short time before exiting.
-	__INEFFICIENT_delay(750);
+	delay(750);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1002,7 +975,7 @@ void xbox_splash() {
 	GFXPAL[FB_PAL_OFFSET+0x1ff]=0x40ff00ff; //so it becomes this instead.
 
 	//This makes sure not to read button still pressed from badge menu selection
-	__button_wait_for_release();
+	wait_for_button_release();
 
 	//Set map to tilemap B, clear tilemap, set attr to 0
 	//Not sure yet what attr does, but tilemap be is important as it will have the effect of layering
@@ -1044,11 +1017,11 @@ void xbox_splash() {
 	for (uint8_t i = 0; i < 60; i++) {
 		scale -= 0.1;
 		gfx_set_xlate_val(0, 240, 128, scale, 0);
-		__INEFFICIENT_delay(1);
+		delay(1);
 	}
 
 	// Logo complete, allow admiration for a short time before exiting.
-	__INEFFICIENT_delay(750);
+	delay(750);
 }
 
 /////////////////////////////////////////////////////////////////////////////
